@@ -19,12 +19,18 @@ public class Sampler implements SensorEventListener {
 
     private static Sampler instance;
 
+    // delay between updates
+    private long updateDelay = 1000;
     // window size for fft
     private int windowSize = 128;
     private SensorManager sensorManager;
 
 
+    FFT fft;
+
     private double[] buffer;
+    private double real[];
+    private double imaginary[];
     // array index
     private int index;
 
@@ -64,6 +70,38 @@ public class Sampler implements SensorEventListener {
      * start thread pushing processed data to sinks
      */
     private void startPusherThread() {
+
+        new Thread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        long scheduled  = System.currentTimeMillis() + updateDelay;
+                        while (active) {
+                            try {
+                                long delay = scheduled - System.currentTimeMillis();
+                                if(delay < 0) {
+                                    delay = 0;
+                                    scheduled = System.currentTimeMillis();
+                                }
+                                Thread.sleep(delay);
+                                scheduled =  scheduled + updateDelay;
+                            } catch (InterruptedException e) {
+                               // ignore it
+                            }
+                        }
+                        updateData();
+                    }
+                }
+        ).start();
+
+    }
+
+    /**
+     * compute fft and update  sinks
+     */
+    private void updateData() {
+
+        // calculate fft and create sample
 
     }
 
@@ -133,6 +171,9 @@ public class Sampler implements SensorEventListener {
      */
     private void reset() {
         buffer = new double[windowSize];
+        real = new double[windowSize];
+        imaginary = new double[windowSize];
+        fft = new FFT(windowSize);
         index = 0;
     }
 
@@ -154,5 +195,13 @@ public class Sampler implements SensorEventListener {
      */
     public void setWindowSize(int windowSize) {
         this.windowSize = windowSize;
+    }
+
+    public long getUpdateDelay() {
+        return updateDelay;
+    }
+
+    public void setUpdateDelay(long updateDelay) {
+        this.updateDelay = updateDelay;
     }
 }

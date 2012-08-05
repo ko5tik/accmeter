@@ -195,11 +195,30 @@ public class SamplerTest {
     public void testProperResetting(@Mocked(methods = {"reset", "setWindowSize"}, inverse = true) final Sampler sampler) {
 
 
-        sampler.setWindowSize(239);
+        sampler.setWindowSize(256);
         Deencapsulation.invoke(sampler,"reset");
 
         final double[] buffer = Deencapsulation.getField(sampler, "buffer");
+        assertEquals(256,buffer.length);
+
+
+        final double[] real = Deencapsulation.getField(sampler, "real");
+        assertEquals(256,real.length);
+
+
+        final double[] imaginary = Deencapsulation.getField(sampler, "imaginary");
+        assertEquals(256,imaginary.length);
+
+
+
         assertEquals(0,Deencapsulation.getField(sampler,"index"));
-        assertEquals(239,buffer.length);
+
+
+
+
+        // shall create fft with proper size
+        final FFT fft = Deencapsulation.getField(sampler, "fft");
+        assertNotNull(fft);
+        assertEquals(256,Deencapsulation.getField(fft,"n"));
     }
 }
