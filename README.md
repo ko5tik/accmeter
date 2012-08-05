@@ -1,4 +1,4 @@
 accmeter
 ========
 
-Convenience library for android device accelerometer access
+Convenience library for android device accelerometer access.
