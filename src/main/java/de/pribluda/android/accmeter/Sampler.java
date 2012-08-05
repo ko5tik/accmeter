@@ -8,6 +8,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -25,6 +26,8 @@ public class Sampler implements SensorEventListener {
     private int windowSize = 128;
     private SensorManager sensorManager;
 
+    private long lastEvent;
+
 
     FFT fft;
 
@@ -37,6 +40,7 @@ public class Sampler implements SensorEventListener {
     private final List<SampleSink> sinkList = new ArrayList<SampleSink>();
 
     private boolean active = false;
+    private long eventFrequency;
 
     public Sampler(Context context) {
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
@@ -75,18 +79,18 @@ public class Sampler implements SensorEventListener {
                 new Runnable() {
                     @Override
                     public void run() {
-                        long scheduled  = System.currentTimeMillis() + updateDelay;
+                        long scheduled = System.currentTimeMillis() + updateDelay;
                         while (active) {
                             try {
                                 long delay = scheduled - System.currentTimeMillis();
-                                if(delay < 0) {
+                                if (delay < 0) {
                                     delay = 0;
                                     scheduled = System.currentTimeMillis();
                                 }
                                 Thread.sleep(delay);
-                                scheduled =  scheduled + updateDelay;
+                                scheduled = scheduled + updateDelay;
                             } catch (InterruptedException e) {
-                               // ignore it
+                                // ignore it
                             }
                         }
                         updateData();
@@ -101,8 +105,19 @@ public class Sampler implements SensorEventListener {
      */
     private void updateData() {
 
-        // calculate fft and create sample
+        // calculate fft
+        System.arraycopy(buffer, 0, real, 0, windowSize);
+        Arrays.fill(imaginary, 0);
+        fft.fft(real, imaginary);
 
+        // create sample object
+        final Sample sample = new Sample();
+        sample.setReal(Arrays.copyOf(real, real.length));
+        sample.setImaginary(Arrays.copyOf(imaginary, imaginary.length));
+        sample.setTimestamp(System.currentTimeMillis());
+        sample.setSampleRate(eventFrequency);
+
+        pushSample(sample);
     }
 
 
@@ -129,6 +144,16 @@ public class Sampler implements SensorEventListener {
 
             index++;
             index %= windowSize;
+
+            // calculate delay of last event  and event rate
+            final long thisEvent = sensorEvent.timestamp;
+            long delay = thisEvent - lastEvent;
+            lastEvent = thisEvent;
+
+            if (0 != delay) {
+                eventFrequency = 1000000 / delay;
+            }
+
         }
     }
 
@@ -175,6 +200,8 @@ public class Sampler implements SensorEventListener {
         imaginary = new double[windowSize];
         fft = new FFT(windowSize);
         index = 0;
+
+        lastEvent = System.nanoTime();
     }
 
 

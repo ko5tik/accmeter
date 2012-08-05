@@ -5,12 +5,13 @@ package de.pribluda.android.accmeter;
  */
 public class Sample {
 
+    long timestamp;
     double sampleRate;
     double[] real;
     double[] imaginary;
 
     /**
-     * sample rate of original data
+     * sample rate of original data (  use herz for now )
      * @return
      */
     public double getSampleRate() {
@@ -43,5 +44,13 @@ public class Sample {
 
     public void setImaginary(double[] imaginary) {
         this.imaginary = imaginary;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 }
