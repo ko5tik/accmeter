@@ -6,7 +6,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,22 +30,34 @@ public class Sampler implements SensorEventListener {
 
     private final List<SampleSink> sinkList = new ArrayList<SampleSink>();
 
+    private boolean active = false;
 
     public Sampler(Context context) {
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
     }
 
 
+    /**
+     * start sensor data acquisition, processing and pushing to  destinations
+     */
     public void start() {
-        Log.d(LOG_TAG, "started");
-        sensorManager.registerListener(this, sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER).get(0), SensorManager.SENSOR_DELAY_FASTEST);
+        if (!active) {
+            reset();
 
+            final List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
+            if (!sensorList.isEmpty()) {
+                active = true;
+                sensorManager.registerListener(this, sensorList.get(0), SensorManager.SENSOR_DELAY_FASTEST);
+            }
+        }
     }
 
 
     public void stop() {
-        Log.d(LOG_TAG, "stopped");
-        sensorManager.unregisterListener(this);
+        if (active) {
+            sensorManager.unregisterListener(this);
+            active = false;
+        }
     }
 
     /**
@@ -55,7 +66,7 @@ public class Sampler implements SensorEventListener {
      * @param sensorEvent
      */
     public void onSensorChanged(SensorEvent sensorEvent) {
-        Log.d(LOG_TAG, "received event");
+
         // we are only interested in accelerometer events
         if (Sensor.TYPE_ACCELEROMETER == sensorEvent.sensor.getType()) {
             // compute modulo
@@ -102,5 +113,12 @@ public class Sampler implements SensorEventListener {
         for (SampleSink sink : sinkList) {
             sink.put(sample);
         }
+    }
+
+    /**
+     * reset sampler state
+     */
+    private void reset() {
+
     }
 }
