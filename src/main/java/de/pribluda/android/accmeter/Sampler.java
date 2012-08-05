@@ -20,11 +20,11 @@ public class Sampler implements SensorEventListener {
     private static Sampler instance;
 
     // window size for fft
-    public static final int WINDOW_SIZE = 128;
+    private int windowSize = 128;
     private SensorManager sensorManager;
 
 
-    private final double[] buffer = new double[WINDOW_SIZE];
+    private double[] buffer;
     // array index
     private int index;
 
@@ -37,6 +37,13 @@ public class Sampler implements SensorEventListener {
     }
 
 
+    public static Sampler getInstance(Context context) {
+        if (instance == null) {
+            instance = new Sampler(context);
+        }
+        return instance;
+    }
+
     /**
      * start sensor data acquisition, processing and pushing to  destinations
      */
@@ -48,8 +55,16 @@ public class Sampler implements SensorEventListener {
             if (!sensorList.isEmpty()) {
                 active = true;
                 sensorManager.registerListener(this, sensorList.get(0), SensorManager.SENSOR_DELAY_FASTEST);
+                startPusherThread();
             }
         }
+    }
+
+    /**
+     * start thread pushing processed data to sinks
+     */
+    private void startPusherThread() {
+
     }
 
 
@@ -72,12 +87,10 @@ public class Sampler implements SensorEventListener {
             // compute modulo
             double modulo = Math.sqrt(sensorEvent.values[0] * sensorEvent.values[0] + sensorEvent.values[1] * sensorEvent.values[1] + sensorEvent.values[2] * sensorEvent.values[2]);
             // store difference
-            buffer[index] = /*lastSample - */modulo;
-            //   lastSample = modulo;
-            //  Log.d(LOG_TAG,"sample:" + lastSample + " difference:" + buffer[index]) ;
-            // advance index
+            buffer[index] = modulo;
+
             index++;
-            index %= WINDOW_SIZE;
+            index %= windowSize;
         }
     }
 
@@ -119,6 +132,27 @@ public class Sampler implements SensorEventListener {
      * reset sampler state
      */
     private void reset() {
+        buffer = new double[windowSize];
+        index = 0;
+    }
 
+
+    /**
+     * configured window size
+     *
+     * @return
+     */
+    public int getWindowSize() {
+        return windowSize;
+    }
+
+    /**
+     * adjust window size. needs restart to take effect. Only power of 2 ( 32, 64 ... 512 ) values are acceptable
+     * for FFT ( 1024 is out of bounds ) ,  most useful values are 64 / 128 / 256
+     *
+     * @param windowSize
+     */
+    public void setWindowSize(int windowSize) {
+        this.windowSize = windowSize;
     }
 }

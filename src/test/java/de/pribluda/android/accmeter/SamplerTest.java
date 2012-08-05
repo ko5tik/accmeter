@@ -13,9 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * test capabilities of sampler
@@ -100,6 +98,7 @@ public class SamplerTest {
                 sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
                 returns(Arrays.asList(sensor));
                 sensorManager.registerListener(sampler, sensor, SensorManager.SENSOR_DELAY_FASTEST);
+                invoke(sampler, "startPusherThread");
             }
         };
 
@@ -186,5 +185,21 @@ public class SamplerTest {
             }
         };
 
+    }
+
+
+    /**
+     * shall initialise internal buffers on reset
+     */
+    @Test
+    public void testProperResetting(@Mocked(methods = {"reset", "setWindowSize"}, inverse = true) final Sampler sampler) {
+
+
+        sampler.setWindowSize(239);
+        Deencapsulation.invoke(sampler,"reset");
+
+        final double[] buffer = Deencapsulation.getField(sampler, "buffer");
+        assertEquals(0,Deencapsulation.getField(sampler,"index"));
+        assertEquals(239,buffer.length);
     }
 }
