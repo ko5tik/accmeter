@@ -112,8 +112,12 @@ public class Sampler implements SensorEventListener {
 
         // create sample object
         final Sample sample = new Sample();
-        sample.setReal(Arrays.copyOf(real, real.length));
-        sample.setImaginary(Arrays.copyOf(imaginary, imaginary.length));
+        //  can not use arrays, as androis sports only 1.5 without copy of
+        sample.setReal(new double[real.length]);
+        System.arraycopy(real,0,sample.getReal(),0,real.length);
+        sample.setImaginary(new double[imaginary.length]);
+        System.arraycopy(imaginary,0,sample.getImaginary(),0,imaginary.length);
+
         sample.setTimestamp(System.currentTimeMillis());
         sample.setSampleRate(eventFrequency);
 
