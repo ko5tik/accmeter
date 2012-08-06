@@ -92,8 +92,9 @@ public class Sampler implements SensorEventListener {
                             } catch (InterruptedException e) {
                                 // ignore it
                             }
+                            updateData();
                         }
-                        updateData();
+
                     }
                 }
         ).start();
