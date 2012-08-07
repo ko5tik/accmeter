@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * gather samples from accelerometer and pipe them into  sinks
+ * gather samples from accelerometer and pipe them into  file
  */
 public class Sampler implements SensorEventListener {
 
@@ -73,7 +73,7 @@ public class Sampler implements SensorEventListener {
     }
 
     /**
-     * start thread pushing processed data to sinks
+     * start thread pushing processed data to file
      */
     private void startPusherThread() {
 
@@ -104,7 +104,7 @@ public class Sampler implements SensorEventListener {
     }
 
     /**
-     * compute fft and update  sinks
+     * compute fft and update  file
      */
     private void updateData() {
 

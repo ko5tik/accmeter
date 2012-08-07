@@ -24,7 +24,7 @@ public class SamplerTest {
 
 
     /**
-     * samples shall be pushed to all sinks
+     * samples shall be pushed to all file
      */
     @Test
     public void testThatSamplesArePushedToAllAddedSinks(@Mocked(methods = {"pushSample", "addSink", "removeSink"}, inverse = true) final Sampler sampler,
