@@ -41,9 +41,11 @@ public class Sampler implements SensorEventListener {
 
     private boolean active = false;
     private long eventFrequency;
+    private  int sensorDelay;
 
     public Sampler(Context context) {
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        sensorDelay = SensorManager.SENSOR_DELAY_GAME;
     }
 
 
@@ -64,7 +66,7 @@ public class Sampler implements SensorEventListener {
             final List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
             if (!sensorList.isEmpty()) {
                 active = true;
-                sensorManager.registerListener(this, sensorList.get(0), SensorManager.SENSOR_DELAY_FASTEST);
+                sensorManager.registerListener(this, sensorList.get(0), sensorDelay);
                 startPusherThread();
             }
         }
@@ -107,8 +109,13 @@ public class Sampler implements SensorEventListener {
     private void updateData() {
 
         // calculate fft
-        System.arraycopy(buffer, 0, real, 0, windowSize);
+        // System.arraycopy(buffer, 0, real, 0, windowSize);
+        for(int i = 0; i < buffer.length; i++) {
+            real[i] = buffer[ (index + i + 1) % buffer.length];
+        }
+
         Arrays.fill(imaginary, 0);
+
         fft.fft(real, imaginary);
 
         // create sample object
@@ -156,7 +163,8 @@ public class Sampler implements SensorEventListener {
             lastEvent = thisEvent;
 
             if (0 != delay) {
-                eventFrequency = 1000000 / delay;
+                System.err.println("set delay:" + delay);
+                eventFrequency = 1000000000 / delay;
             }
 
         }
@@ -235,5 +243,19 @@ public class Sampler implements SensorEventListener {
 
     public void setUpdateDelay(long updateDelay) {
         this.updateDelay = updateDelay;
+    }
+
+    /**
+     * configured sensor delay.  use constants from  SensorManager class.  Changes will be actived after restart
+     * DELAY_GAME (default) seems to be most uniform,  but does not send events if there is no changes below some
+     * threshold, DELAY_FASTEST sends always but is not uniform.
+     * @return
+     */
+    public int getSensorDelay() {
+        return sensorDelay;
+    }
+
+    public void setSensorDelay(int sensorDelay) {
+        this.sensorDelay = sensorDelay;
     }
 }

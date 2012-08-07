@@ -97,7 +97,7 @@ public class SamplerTest {
                 invoke(sampler, "reset");
                 sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
                 returns(Arrays.asList(sensor));
-                sensorManager.registerListener(sampler, sensor, SensorManager.SENSOR_DELAY_FASTEST);
+                sensorManager.registerListener(sampler, sensor, SensorManager.SENSOR_DELAY_GAME);
                 invoke(sampler, "startPusherThread");
             }
         };
