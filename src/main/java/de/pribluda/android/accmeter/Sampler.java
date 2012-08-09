@@ -210,6 +210,7 @@ public class Sampler implements SensorEventListener {
     private void reset() {
         buffer = new double[windowSize];
         real = new double[windowSize];
+        Arrays.fill(real,SensorManager.GRAVITY_EARTH);
         imaginary = new double[windowSize];
         fft = new FFT(windowSize);
         index = 0;

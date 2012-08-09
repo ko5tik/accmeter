@@ -110,6 +110,11 @@
             <version>1.5_r3</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>de.pribluda.android</groupId>
+            <artifactId>jsonmarshaller</artifactId>
+            <version>0.6</version>
+        </dependency>
         <!--  this dependency shall be BEFORE junit -->
         <dependency>
             <groupId>com.googlecode.jmockit</groupId>

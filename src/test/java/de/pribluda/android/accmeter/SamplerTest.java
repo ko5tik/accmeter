@@ -92,6 +92,7 @@ public class SamplerTest {
                                     @Mocked final Sensor sensor) {
 
         Deencapsulation.setField(sampler, "sensorManager", sensorManager);
+        Deencapsulation.setField(sampler, "sensorDelay", SensorManager.SENSOR_DELAY_GAME);
         new Expectations() {
             {
                 invoke(sampler, "reset");
@@ -196,29 +197,29 @@ public class SamplerTest {
 
 
         sampler.setWindowSize(256);
-        Deencapsulation.invoke(sampler,"reset");
+        Deencapsulation.invoke(sampler, "reset");
 
         final double[] buffer = Deencapsulation.getField(sampler, "buffer");
-        assertEquals(256,buffer.length);
+        assertEquals(256, buffer.length);
 
 
         final double[] real = Deencapsulation.getField(sampler, "real");
-        assertEquals(256,real.length);
+        assertEquals(256, real.length);
 
+        for (int i = 0; i < real.length; i++) {
+            assertEquals(SensorManager.GRAVITY_EARTH,real[i],0.00000001);
+        }
 
         final double[] imaginary = Deencapsulation.getField(sampler, "imaginary");
-        assertEquals(256,imaginary.length);
+        assertEquals(256, imaginary.length);
 
 
-
-        assertEquals(0,Deencapsulation.getField(sampler,"index"));
-
-
+        assertEquals(0, Deencapsulation.getField(sampler, "index"));
 
 
         // shall create fft with proper size
         final FFT fft = Deencapsulation.getField(sampler, "fft");
         assertNotNull(fft);
-        assertEquals(256,Deencapsulation.getField(fft,"n"));
+        assertEquals(256, Deencapsulation.getField(fft, "n"));
     }
 }
