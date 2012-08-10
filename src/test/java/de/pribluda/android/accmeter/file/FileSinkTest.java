@@ -30,6 +30,8 @@ public class FileSinkTest {
         new Expectations() {
             {
                 new JsonWriter(writer);
+
+                jsonWriter.setLenient(true);
             }
         };
 

@@ -25,6 +25,7 @@ public class FileSink implements SampleSink {
     public FileSink(Writer destination) {
         this.destination = destination;
         jsonWriter = new JsonWriter(destination);
+        jsonWriter.setLenient(true);
         amount = 0;
     }
 
