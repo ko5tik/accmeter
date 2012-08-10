@@ -5,6 +5,9 @@ import de.pribluda.android.accmeter.Sample;
 import de.pribluda.android.accmeter.SampleSink;
 import de.pribluda.android.jsonmarshaller.JSONMarshaller;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Writer;
 
 /**
@@ -17,15 +20,19 @@ public class FileSink implements SampleSink {
     private final Writer destination;
     private final JsonWriter jsonWriter;
     private int amount;
+
     /**
      * create file sink and prepare to write
      *
-     * @param destination
+     * @param destinationFile shall be writeable
      */
-    public FileSink(Writer destination) {
-        this.destination = destination;
+    public FileSink(File destinationFile) throws IOException {
+        this.destination = new FileWriter(destinationFile);
         jsonWriter = new JsonWriter(destination);
         jsonWriter.setLenient(true);
+
+        jsonWriter.beginArray();
+
         amount = 0;
     }
 
@@ -33,7 +40,7 @@ public class FileSink implements SampleSink {
     @Override
     public void put(Sample sample) {
         try {
-            JSONMarshaller.marshall(jsonWriter,sample);
+            JSONMarshaller.marshall(jsonWriter, sample);
             amount++;
         } catch (Exception e) {
             e.printStackTrace();
@@ -44,4 +51,13 @@ public class FileSink implements SampleSink {
         return amount;
     }
 
+
+    /**
+     * close writer
+     */
+    public void close() throws IOException {
+        jsonWriter.endArray();
+        destination.close();
+
+    }
 }

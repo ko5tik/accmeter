@@ -8,6 +8,8 @@ import mockit.Expectations;
 import mockit.Mocked;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
@@ -25,17 +27,25 @@ public class FileSinkTest {
      */
     @Test
     public void testSinkCreation(@Mocked final JsonWriter jsonWriter,
-                                 @Mocked final Writer writer) {
+                                 @Mocked final File destFile,
+                                 @Mocked final FileWriter fileWriter) throws IOException {
 
         new Expectations() {
             {
-                new JsonWriter(writer);
+
+                new FileWriter(destFile);
+
+                //result = fileWriter;
+
+                new JsonWriter((Writer) any);
 
                 jsonWriter.setLenient(true);
+
+                jsonWriter.beginArray();
             }
         };
 
-        new FileSink(writer);
+        new FileSink(destFile);
     }
 
 
@@ -52,7 +62,7 @@ public class FileSinkTest {
 
         new Expectations() {
             {
-                JSONMarshaller.marshall(jsonWriter,sample);
+                JSONMarshaller.marshall(jsonWriter, sample);
             }
         };
 
@@ -65,7 +75,21 @@ public class FileSinkTest {
      * test proper actionc
      */
     @Test
-    public  void testClosing() {
+    public void testClosing(@Mocked final JsonWriter jsonWriter,
+                            @Mocked final FileWriter fileWriter,
+                            @Mocked(methods = {"close"}, inverse = true) final FileSink fileSink) throws IOException {
 
+
+        Deencapsulation.setField(fileSink, "destination", fileWriter);
+        Deencapsulation.setField(fileSink, "jsonWriter", jsonWriter);
+        new Expectations() {
+            {
+
+                jsonWriter.endArray();
+                fileWriter.close();
+            }
+        };
+
+        fileSink.close();
     }
 }
