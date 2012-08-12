@@ -58,7 +58,9 @@ public class FileSinkTest {
                                   @Mocked final Sample sample,
                                   @Mocked(methods = {"put"}, inverse = true) final FileSink sink) throws IOException, InvocationTargetException, NoSuchMethodException, IllegalAccessException {
 
+        //  as constructor was mocked away...
         Deencapsulation.setField(sink, "jsonWriter", jsonWriter);
+        Deencapsulation.setField(sink, "active", true);
 
         new Expectations() {
             {

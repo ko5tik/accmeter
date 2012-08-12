@@ -20,6 +20,7 @@ public class FileSink implements SampleSink {
     private final Writer destination;
     private final JsonWriter jsonWriter;
     private int amount;
+    private boolean active = true;
 
     /**
      * create file sink and prepare to write
@@ -38,12 +39,14 @@ public class FileSink implements SampleSink {
 
 
     @Override
-    public void put(Sample sample) {
-        try {
-            JSONMarshaller.marshall(jsonWriter, sample);
-            amount++;
-        } catch (Exception e) {
-            e.printStackTrace();
+    public synchronized void put(Sample sample) {
+        if (active) {
+            try {
+                JSONMarshaller.marshall(jsonWriter, sample);
+                amount++;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -55,9 +58,9 @@ public class FileSink implements SampleSink {
     /**
      * close writer
      */
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
+        active = false;
         jsonWriter.endArray();
         destination.close();
-
     }
 }

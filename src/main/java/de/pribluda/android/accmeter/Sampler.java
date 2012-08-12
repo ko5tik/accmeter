@@ -7,9 +7,9 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * gather samples from accelerometer and pipe them into  file
@@ -37,7 +37,8 @@ public class Sampler implements SensorEventListener {
     // array index
     private int index;
 
-    private final List<SampleSink> sinkList = new ArrayList<SampleSink>();
+    // use copy on write to prevent eventual race conditions on sink list
+    private final List<SampleSink> sinkList = new CopyOnWriteArrayList<SampleSink>();
 
     private boolean active = false;
     private long eventFrequency;
