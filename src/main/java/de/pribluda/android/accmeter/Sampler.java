@@ -6,6 +6,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.util.Log;
 
 import java.util.Arrays;
 import java.util.List;
@@ -43,6 +44,7 @@ public class Sampler implements SensorEventListener {
     private boolean active = false;
     private long eventFrequency;
     private  int sensorDelay;
+    private Thread pusherThread;
 
     public Sampler(Context context) {
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
@@ -78,7 +80,7 @@ public class Sampler implements SensorEventListener {
      */
     private void startPusherThread() {
 
-        new Thread(
+        pusherThread = new Thread(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -100,7 +102,8 @@ public class Sampler implements SensorEventListener {
 
                     }
                 }
-        ).start();
+        );
+        pusherThread.start();
 
     }
 
@@ -136,8 +139,14 @@ public class Sampler implements SensorEventListener {
 
     public void stop() {
         if (active) {
-            sensorManager.unregisterListener(this);
             active = false;
+            sensorManager.unregisterListener(this);
+            try {
+                pusherThread.join(2000);
+            } catch (InterruptedException e) {
+                Log.e(LOG_TAG,"error while joining pusher thread",e);
+            }
+
         }
     }
 

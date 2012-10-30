@@ -153,13 +153,15 @@ public class SamplerTest {
      */
     @Test
     public void testSensorStop(@Mocked(methods = {"stop"}, inverse = true) final Sampler sampler,
-                               @Mocked final SensorManager sensorManager) {
+                               @Mocked final SensorManager sensorManager) throws InterruptedException {
 
         Deencapsulation.setField(sampler, "sensorManager", sensorManager);
         Deencapsulation.setField(sampler, "active", true);
+        Deencapsulation.setField(sampler, "pusherThread", new Thread());
         new Expectations() {
             {
                 sensorManager.unregisterListener(sampler);
+
             }
         };
 
@@ -207,7 +209,7 @@ public class SamplerTest {
         assertEquals(256, real.length);
 
         for (int i = 0; i < real.length; i++) {
-            assertEquals(SensorManager.GRAVITY_EARTH,real[i],0.00000001);
+            assertEquals(SensorManager.GRAVITY_EARTH, real[i], 0.00000001);
         }
 
         final double[] imaginary = Deencapsulation.getField(sampler, "imaginary");
