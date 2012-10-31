@@ -113,7 +113,6 @@ public class Sampler implements SensorEventListener {
     private void updateData() {
 
         // calculate fft
-        // System.arraycopy(buffer, 0, real, 0, windowSize);
         for(int i = 0; i < buffer.length; i++) {
             real[i] = buffer[ (index + i + 1) % buffer.length];
         }
@@ -142,7 +141,7 @@ public class Sampler implements SensorEventListener {
             active = false;
             sensorManager.unregisterListener(this);
             try {
-                pusherThread.join(2000);
+                pusherThread.join();
             } catch (InterruptedException e) {
                 Log.e(LOG_TAG,"error while joining pusher thread",e);
             }
