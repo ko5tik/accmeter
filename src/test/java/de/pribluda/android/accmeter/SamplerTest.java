@@ -10,6 +10,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 
 import static org.junit.Assert.*;
@@ -55,7 +56,11 @@ public class SamplerTest {
 
 
         sampler.addSink(first);
+        sampler.addSink(first);
         sampler.addSink(second);
+
+        assertEquals(2, ((Collection) Deencapsulation.getField(sampler, "sinkList")).size());
+
         sampler.removeSink(first);
         sampler.removeSink(second);
 

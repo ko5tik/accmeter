@@ -16,7 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * @author Konstantin Pribluda
  */
-public class Sampler implements SensorEventListener {
+public class Sampler {
 
     public static final String LOG_TAG = "strokeCounter.detector";
 
@@ -70,83 +70,6 @@ public class Sampler implements SensorEventListener {
         return instance;
     }
 
-
-    /**
-     * start sensor data acquisition, processing and pushing to  destinations
-     */
-    public void start() {
-        if (!active) {
-            reset();
-
-            final List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
-            if (!sensorList.isEmpty()) {
-                active = true;
-                sensorManager.registerListener(this, sensorList.get(0), sensorDelay);
-                startPusherThread();
-            }
-        }
-    }
-
-    /**
-     * start thread pushing processed data to file
-     */
-    private void startPusherThread() {
-
-        pusherThread = new Thread(
-                new Runnable() {
-                    @Override
-                    public void run() {
-
-                    }
-                }
-        );
-        pusherThread.start();
-
-    }
-
-
-    /**
-     * receive sensor event and place it into  buffer
-     *
-     * @param sensorEvent
-     */
-    public void onSensorChanged(SensorEvent sensorEvent) {
-
-        // we are only interested in accelerometer events
-        if (Sensor.TYPE_ACCELEROMETER == sensorEvent.sensor.getType()) {
-            // compute modulo
-            double modulo = Math.sqrt(sensorEvent.values[0] * sensorEvent.values[0] + sensorEvent.values[1] * sensorEvent.values[1] + sensorEvent.values[2] * sensorEvent.values[2]);
-            // store difference
-            buffer[index] = modulo;
-
-            index++;
-            index %= windowSize;
-
-            // calculate delay of last event  and event rate
-            final long thisEvent = sensorEvent.timestamp;
-            long delay = thisEvent - lastEvent;
-            lastEvent = thisEvent;
-
-            if (0 != delay) {
-                System.err.println("set delay:" + delay);
-                eventFrequency = 1000000000 / delay;
-            }
-
-        }
-    }
-
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
-    /**
-     * access to sample buffer
-     *
-     * @return
-     */
-    public double[] getBuffer() {
-        return buffer;
-    }
 
     public void addSink(SampleSink sink) {
         if (!sinkList.contains(sink)) {
@@ -238,7 +161,7 @@ public class Sampler implements SensorEventListener {
         private final double[] real;
         private final double[] imaginary;
         private final FFT fft;
-        private final int index;
+        private int index;
 
 
         // delay between updates
@@ -290,15 +213,40 @@ public class Sampler implements SensorEventListener {
 
         }
 
-        @Override
+        /**
+         * receive sensor event and place it into  buffer
+         *
+         * @param sensorEvent
+         */
         public void onSensorChanged(SensorEvent sensorEvent) {
 
+            // we are only interested in accelerometer events
+            if (Sensor.TYPE_ACCELEROMETER == sensorEvent.sensor.getType()) {
+                // compute modulo
+                double modulo = Math.sqrt(sensorEvent.values[0] * sensorEvent.values[0] + sensorEvent.values[1] * sensorEvent.values[1] + sensorEvent.values[2] * sensorEvent.values[2]);
+                // store difference
+                buffer[index] = modulo;
+
+                index++;
+                index %= windowSize;
+
+                // calculate delay of last event  and event rate
+//                final long thisEvent = sensorEvent.timestamp;
+//                long delay = thisEvent - lastEvent;
+//                lastEvent = thisEvent;
+
+//                if (0 != delay) {
+//                    System.err.println("set delay:" + delay);
+//                    eventFrequency = 1000000000 / delay;
+//                }
+
+            }
         }
 
-        @Override
         public void onAccuracyChanged(Sensor sensor, int i) {
 
         }
+
 
         @Override
         public void run() {
