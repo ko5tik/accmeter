@@ -6,14 +6,15 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.util.Log;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * gather samples from accelerometer and pipe them into  file
+ * gather samples from accelerometer and pipe them into designated sinks
+ *
+ * @author Konstantin Pribluda
  */
 public class Sampler implements SensorEventListener {
 
@@ -25,6 +26,9 @@ public class Sampler implements SensorEventListener {
     private long updateDelay = 1000;
     // window size for fft
     private int windowSize = 128;
+    //  configured sencor delay
+    private int sensorDelay;
+
     private SensorManager sensorManager;
 
     private long lastEvent;
@@ -43,8 +47,15 @@ public class Sampler implements SensorEventListener {
 
     private boolean active = false;
     private long eventFrequency;
-    private  int sensorDelay;
+
     private Thread pusherThread;
+
+
+    /**
+     * active worker if any
+     */
+    private Worker worker;
+
 
     public Sampler(Context context) {
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
@@ -58,6 +69,7 @@ public class Sampler implements SensorEventListener {
         }
         return instance;
     }
+
 
     /**
      * start sensor data acquisition, processing and pushing to  destinations
@@ -84,21 +96,6 @@ public class Sampler implements SensorEventListener {
                 new Runnable() {
                     @Override
                     public void run() {
-                        long scheduled = System.currentTimeMillis() + updateDelay;
-                        while (active) {
-                            try {
-                                long delay = scheduled - System.currentTimeMillis();
-                                if (delay < 0) {
-                                    delay = 0;
-                                    scheduled = System.currentTimeMillis();
-                                }
-                                Thread.sleep(delay);
-                                scheduled = scheduled + updateDelay;
-                            } catch (InterruptedException e) {
-                                // ignore it
-                            }
-                            updateData();
-                        }
 
                     }
                 }
@@ -107,47 +104,6 @@ public class Sampler implements SensorEventListener {
 
     }
 
-    /**
-     * compute fft and update  file
-     */
-    private void updateData() {
-
-        // calculate fft
-        for(int i = 0; i < buffer.length; i++) {
-            real[i] = buffer[ (index + i + 1) % buffer.length];
-        }
-
-        Arrays.fill(imaginary, 0);
-
-        fft.fft(real, imaginary);
-
-        // create sample object
-        final Sample sample = new Sample();
-        //  can not use arrays, as androis sports only 1.5 without copy of
-        sample.setReal(new double[real.length]);
-        System.arraycopy(real,0,sample.getReal(),0,real.length);
-        sample.setImaginary(new double[imaginary.length]);
-        System.arraycopy(imaginary,0,sample.getImaginary(),0,imaginary.length);
-
-        sample.setTimestamp(System.currentTimeMillis());
-        sample.setSampleRate(eventFrequency);
-
-        pushSample(sample);
-    }
-
-
-    public void stop() {
-        if (active) {
-            active = false;
-            sensorManager.unregisterListener(this);
-            try {
-                pusherThread.join();
-            } catch (InterruptedException e) {
-                Log.e(LOG_TAG,"error while joining pusher thread",e);
-            }
-
-        }
-    }
 
     /**
      * receive sensor event and place it into  buffer
@@ -196,33 +152,27 @@ public class Sampler implements SensorEventListener {
         if (!sinkList.contains(sink)) {
             sinkList.add(sink);
         }
+
+        // added first sink to list, create and start worker
+        if (null == worker && !sinkList.isEmpty()) {
+            worker = new Worker(sensorManager, windowSize, sensorDelay, updateDelay, sinkList);
+            worker.start();
+        }
     }
 
     public void removeSink(SampleSink sink) {
         sinkList.remove(sink);
-    }
-
-
-    /*
-     * push samples to registered sink
-     * @param  sample
-     */
-    private void pushSample(Sample sample) {
-        for (SampleSink sink : sinkList) {
-            sink.put(sample);
+        if (sinkList.isEmpty()) {
+            worker.stop();
+            worker = null;
         }
     }
+
 
     /**
      * reset sampler state
      */
     private void reset() {
-        buffer = new double[windowSize];
-        real = new double[windowSize];
-        Arrays.fill(real,SensorManager.GRAVITY_EARTH);
-        imaginary = new double[windowSize];
-        fft = new FFT(windowSize);
-        index = 0;
 
         lastEvent = System.nanoTime();
     }
@@ -259,6 +209,8 @@ public class Sampler implements SensorEventListener {
      * configured sensor delay.  use constants from  SensorManager class.  Changes will be actived after restart
      * DELAY_GAME (default) seems to be most uniform,  but does not send events if there is no changes below some
      * threshold, DELAY_FASTEST sends always but is not uniform.
+     * threshold, DELAY_FASTEST sends always but is not uniform.
+     *
      * @return
      */
     public int getSensorDelay() {
@@ -267,5 +219,145 @@ public class Sampler implements SensorEventListener {
 
     public void setSensorDelay(int sensorDelay) {
         this.sensorDelay = sensorDelay;
+    }
+
+
+    public static enum RunnerState {
+        // does not run
+        STOPPED,
+        // active
+        RUNNING,
+        // stop was requested
+        STOPPING
+    }
+
+    public static class Worker implements SensorEventListener, Runnable {
+
+        private final SensorManager sensorManager;
+        private final double[] buffer;
+        private final double[] real;
+        private final double[] imaginary;
+        private final FFT fft;
+        private final int index;
+
+
+        // delay between updates
+        private final long updateDelay;
+        // window size for fft
+        private final int windowSize;
+        //  configured sencor delay
+        private final int sensorDelay;
+
+        private final List<SampleSink> sinkList;
+
+        private RunnerState state = RunnerState.STOPPED;
+
+        public Worker(final SensorManager sensorManager, final int windowSize, final int sensorDelay, final long updateDelay, final List<SampleSink> sinkList) {
+            this.sensorManager = sensorManager;
+            buffer = new double[windowSize];
+            real = new double[windowSize];
+            Arrays.fill(real, SensorManager.GRAVITY_EARTH);
+            imaginary = new double[windowSize];
+            fft = new FFT(windowSize);
+            index = 0;
+            this.sensorDelay = sensorDelay;
+            this.windowSize = windowSize;
+            this.updateDelay = updateDelay;
+            this.sinkList = sinkList;
+        }
+
+
+        public void start() {
+
+            final List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
+            if (!sensorList.isEmpty()) {
+                state = RunnerState.RUNNING;
+                sensorManager.registerListener(this, sensorList.get(0), sensorDelay);
+                new Thread(this).start();
+            }
+        }
+
+
+        public void stop() {
+            if (RunnerState.RUNNING == state) {
+                sensorManager.unregisterListener(this);
+                state = RunnerState.STOPPING;
+            }
+        }
+
+
+        private void startPusherThread() {
+
+        }
+
+        @Override
+        public void onSensorChanged(SensorEvent sensorEvent) {
+
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int i) {
+
+        }
+
+        @Override
+        public void run() {
+            long scheduled = System.currentTimeMillis() + updateDelay;
+            while (RunnerState.RUNNING == state) {
+                try {
+                    long delay = scheduled - System.currentTimeMillis();
+                    if (delay < 0) {
+                        delay = 0;
+                        scheduled = System.currentTimeMillis();
+                    }
+                    Thread.sleep(delay);
+                    scheduled = scheduled + updateDelay;
+                } catch (InterruptedException e) {
+                    // ignore it
+                }
+                updateData();
+            }
+            state = RunnerState.STOPPED;
+        }
+
+
+        /**
+         * compute fft and update  file
+         */
+        private void updateData() {
+
+            // calculate fft
+            for (int i = 0; i < buffer.length; i++) {
+                real[i] = buffer[(index + i + 1) % buffer.length];
+            }
+
+            Arrays.fill(imaginary, 0);
+
+            fft.fft(real, imaginary);
+
+            // create sample object
+            final Sample sample = new Sample();
+            //  can not use arrays, as androis sports only 1.5 without copy of
+            sample.setReal(new double[real.length]);
+            System.arraycopy(real, 0, sample.getReal(), 0, real.length);
+            sample.setImaginary(new double[imaginary.length]);
+            System.arraycopy(imaginary, 0, sample.getImaginary(), 0, imaginary.length);
+
+            sample.setTimestamp(System.currentTimeMillis());
+
+            pushSample(sample);
+        }
+
+
+        /*
+        * push samples to registered sink
+        * @param  sample
+        */
+        private void pushSample(Sample sample) {
+            for (SampleSink sink : sinkList) {
+                sink.put(sample);
+            }
+        }
+
     }
 }

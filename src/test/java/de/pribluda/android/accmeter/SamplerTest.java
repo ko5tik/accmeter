@@ -5,7 +5,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import mockit.Deencapsulation;
 import mockit.Expectations;
-import mockit.FullVerifications;
 import mockit.Mocked;
 import org.junit.Test;
 
@@ -24,18 +23,125 @@ public class SamplerTest {
 
 
     /**
+     * shall create and start worker when sink is added,
+     * another sink shall be added to worked
+     * shall stop and dispose worker upon last sink removal
+     */
+    @Test
+    public void testThatWorkerIsStartedUponSinkAdding(@Mocked final Sampler.Worker worker,
+                                                      @Mocked(methods = {"addSink", "removeSink"}, inverse = true) final Sampler sampler,
+                                                      @Mocked final SampleSink first,
+                                                      @Mocked final SampleSink second,
+                                                      @Mocked final SensorManager sensorManager) {
+
+        final ArrayList<SampleSink> sinkList = new ArrayList<SampleSink>();
+
+        Deencapsulation.setField(sampler, "sinkList", sinkList);
+        Deencapsulation.setField(sampler, "updateDelay", 12345l);
+        Deencapsulation.setField(sampler, "windowSize", 128);
+        Deencapsulation.setField(sampler, "sensorDelay", SensorManager.SENSOR_DELAY_UI);
+        Deencapsulation.setField(sampler, "sensorManager", sensorManager);
+
+
+        new Expectations() {
+            {
+                Sampler.Worker worker = new Sampler.Worker(sensorManager, 128, SensorManager.SENSOR_DELAY_UI, 12345, sinkList);
+
+                worker.start();
+
+                worker.stop();
+            }
+        };
+
+
+        sampler.addSink(first);
+        sampler.addSink(second);
+        sampler.removeSink(first);
+        sampler.removeSink(second);
+
+
+        assertNull(Deencapsulation.getField(sampler, "worker"));
+    }
+
+    /**
+     * worker shall create proper buffers and FFT upon creation
+     */
+    @Test
+    public void testProperWorkerInitialisation(@Mocked final SensorManager sensorManager) {
+
+        ArrayList<SampleSink> sinkList = new ArrayList<SampleSink>();
+        Sampler.Worker worker = new Sampler.Worker(sensorManager, 256, SensorManager.SENSOR_DELAY_FASTEST, 1000, sinkList);
+
+
+        final double[] buffer = Deencapsulation.getField(worker, "buffer");
+        assertEquals(256, buffer.length);
+
+
+        final double[] real = Deencapsulation.getField(worker, "real");
+        assertEquals(256, real.length);
+
+        for (int i = 0; i < real.length; i++) {
+            assertEquals(SensorManager.GRAVITY_EARTH, real[i], 0.00000001);
+        }
+
+        final double[] imaginary = Deencapsulation.getField(worker, "imaginary");
+        assertEquals(256, imaginary.length);
+
+
+        assertEquals(0, Deencapsulation.getField(worker, "index"));
+
+
+        // shall create fft with proper size
+        final FFT fft = Deencapsulation.getField(worker, "fft");
+        assertNotNull(fft);
+        assertEquals(256, Deencapsulation.getField(fft, "n"));
+
+        assertEquals(Sampler.RunnerState.STOPPED, Deencapsulation.getField(worker, "state"));
+    }
+
+
+    /**
+     * shall register itself as listener with proper parameters
+     * shall fire up own thread
+     */
+    @Test
+    public void testWorkerStartup(@Mocked final SensorManager sensorManager,
+                                  @Mocked final Sensor sensor,
+                                  @Mocked("startPusherThread") final Sampler.Worker ww
+    ) {
+
+        final Sampler.Worker worker = new Sampler.Worker(sensorManager, 128, SensorManager.SENSOR_DELAY_GAME, 1000, new ArrayList<SampleSink>());
+
+        new Expectations() {
+            {
+                sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
+                returns(Arrays.asList(sensor));
+                sensorManager.registerListener(worker, sensor, SensorManager.SENSOR_DELAY_GAME);
+            }
+        };
+
+
+        worker.start();
+
+        assertEquals(Sampler.RunnerState.RUNNING, Deencapsulation.getField(worker, "state"));
+
+    }
+
+
+    /**
      * samples shall be pushed to all file
      */
     @Test
-    public void testThatSamplesArePushedToAllAddedSinks(@Mocked(methods = {"pushSample", "addSink", "removeSink"}, inverse = true) final Sampler sampler,
+    public void testThatSamplesArePushedToAllAddedSinks(@Mocked(methods = {"pushSample", "addSink", "removeSink"}, inverse = true) final Sampler.Worker worker,
                                                         @Mocked final SampleSink first,
                                                         @Mocked final SampleSink second,
                                                         @Mocked final Sample sample) {
 
-        Deencapsulation.setField(sampler, "sinkList", new ArrayList<SampleSink>());
+        ArrayList<SampleSink> sampleSinks = new ArrayList<SampleSink>();
+        Deencapsulation.setField(worker, "sinkList", sampleSinks);
 
-        sampler.addSink(first);
-        sampler.addSink(second);
+        sampleSinks.add(first);
+        sampleSinks.add(second);
 
         new Expectations() {
             {
@@ -43,17 +149,12 @@ public class SamplerTest {
                 first.put(sample);
                 second.put(sample);
 
-                // first is removed
-                second.put(sample);
             }
         };
 
 
-        Deencapsulation.invoke(sampler, "pushSample", sample);
+        Deencapsulation.invoke(worker, "pushSample", sample);
 
-        sampler.removeSink(first);
-
-        Deencapsulation.invoke(sampler, "pushSample", sample);
 
     }
 
@@ -79,38 +180,6 @@ public class SamplerTest {
 
 
     /**
-     * on start counting it shall:
-     * - reset state
-     * - activate sensor manager with some (TBD) precision
-     * - use itself as a listener
-     * <p/>
-     * but only in case sensor was found
-     */
-    @Test
-    public void testCounterStarting(@Mocked(methods = {"start"}, inverse = true) final Sampler sampler,
-                                    @Mocked final SensorManager sensorManager,
-                                    @Mocked final Sensor sensor) {
-
-        Deencapsulation.setField(sampler, "sensorManager", sensorManager);
-        Deencapsulation.setField(sampler, "sensorDelay", SensorManager.SENSOR_DELAY_GAME);
-        new Expectations() {
-            {
-                invoke(sampler, "reset");
-                sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
-                returns(Arrays.asList(sensor));
-                sensorManager.registerListener(sampler, sensor, SensorManager.SENSOR_DELAY_GAME);
-                invoke(sampler, "startPusherThread");
-            }
-        };
-
-
-        sampler.start();
-
-        assertTrue((Boolean) Deencapsulation.getField(sampler, "active"));
-    }
-
-
-    /**
      * in case no sensor was found shall not register itself
      */
     @Test
@@ -131,97 +200,26 @@ public class SamplerTest {
         assertFalse((Boolean) Deencapsulation.getField(sampler, "active"));
     }
 
-    /**
-     * shall do nothing is already started
-     *
-     * @param sampler
-     */
-    @Test
-    public void testNothingHappensIfAlreadyStarted(@Mocked(methods = {"start"}, inverse = true) final Sampler sampler) {
-        Deencapsulation.setField(sampler, "active", true);
-
-        sampler.start();
-        new FullVerifications() {
-            {
-
-            }
-        };
-    }
 
     /**
      * shall deregister itself aas listener on sensor stop
      */
     @Test
-    public void testSensorStop(@Mocked(methods = {"stop"}, inverse = true) final Sampler sampler,
+    public void testSensorStop(@Mocked(methods = {"stop"}, inverse = true) final Sampler.Worker worker,
                                @Mocked final SensorManager sensorManager) throws InterruptedException {
 
-        Deencapsulation.setField(sampler, "sensorManager", sensorManager);
-        Deencapsulation.setField(sampler, "active", true);
-        Deencapsulation.setField(sampler, "pusherThread", new Thread());
+        Deencapsulation.setField(worker, "sensorManager", sensorManager);
+        Deencapsulation.setField(worker, "state", Sampler.RunnerState.RUNNING);
+
         new Expectations() {
             {
-                sensorManager.unregisterListener(sampler);
-
+                sensorManager.unregisterListener(worker);
             }
         };
 
-
-        sampler.stop();
-
-        assertFalse((Boolean) Deencapsulation.getField(sampler, "active"));
+        worker.stop();
+        assertEquals(Sampler.RunnerState.STOPPING, Deencapsulation.getField(worker, "state"));
     }
 
 
-    /**
-     * if not started,  shall do nothing on stop
-     */
-    @Test
-    public void testThatNothingIsDoneIfNotStarted(@Mocked(methods = {"stop"}, inverse = true) final Sampler sampler) {
-
-
-        sampler.stop();
-
-
-        new FullVerifications() {
-            {
-
-            }
-        };
-
-    }
-
-
-    /**
-     * shall initialise internal buffers on reset
-     */
-    @Test
-    public void testProperResetting(@Mocked(methods = {"reset", "setWindowSize"}, inverse = true) final Sampler sampler) {
-
-
-        sampler.setWindowSize(256);
-        Deencapsulation.invoke(sampler, "reset");
-
-        final double[] buffer = Deencapsulation.getField(sampler, "buffer");
-        assertEquals(256, buffer.length);
-
-
-        final double[] real = Deencapsulation.getField(sampler, "real");
-        assertEquals(256, real.length);
-
-        for (int i = 0; i < real.length; i++) {
-            assertEquals(SensorManager.GRAVITY_EARTH, real[i], 0.00000001);
-        }
-
-        final double[] imaginary = Deencapsulation.getField(sampler, "imaginary");
-        assertEquals(256, imaginary.length);
-
-
-        assertEquals(0, Deencapsulation.getField(sampler, "index"));
-
-
-        // shall create fft with proper size
-        final FFT fft = Deencapsulation.getField(sampler, "fft");
-        assertNotNull(fft);
-        assertEquals(256, Deencapsulation.getField(fft, "n"));
-    }
 }
