@@ -26,15 +26,11 @@ public class Sampler {
     private long updateDelay = 1000;
     // window size for fft
     private int windowSize = 128;
-    //  configured sencor delay
+    //  configured sensor delay
     private int sensorDelay;
 
     private SensorManager sensorManager;
 
-    private long lastEvent;
-
-
-    FFT fft;
 
     private double[] buffer;
     private double real[];
@@ -45,11 +41,7 @@ public class Sampler {
     // use copy on write to prevent eventual race conditions on sink list
     private final List<SampleSink> sinkList = new CopyOnWriteArrayList<SampleSink>();
 
-    private boolean active = false;
     private long eventFrequency;
-
-    private Thread pusherThread;
-
 
     /**
      * active worker if any
@@ -75,7 +67,12 @@ public class Sampler {
         if (!sinkList.contains(sink)) {
             sinkList.add(sink);
         }
+        start();
 
+
+    }
+
+    public void start() {
         // added first sink to list, create and start worker
         if (null == worker && !sinkList.isEmpty()) {
             worker = new Worker(sensorManager, windowSize, sensorDelay, updateDelay, sinkList);
@@ -86,20 +83,23 @@ public class Sampler {
     public void removeSink(SampleSink sink) {
         sinkList.remove(sink);
         if (sinkList.isEmpty()) {
-            worker.stop();
-            worker = null;
+            stop();
         }
     }
 
 
-    /**
-     * reset sampler state
-     */
-    private void reset() {
+    public void restart() {
+        stop();
+        start();
 
-        lastEvent = System.nanoTime();
     }
 
+    public void stop() {
+        if(worker != null) {
+            worker.stop();
+            worker = null;
+        }
+    }
 
     /**
      * configured window size
@@ -153,6 +153,7 @@ public class Sampler {
         // stop was requested
         STOPPING
     }
+
 
     public static class Worker implements SensorEventListener, Runnable {
 
@@ -230,15 +231,6 @@ public class Sampler {
                 index++;
                 index %= windowSize;
 
-                // calculate delay of last event  and event rate
-//                final long thisEvent = sensorEvent.timestamp;
-//                long delay = thisEvent - lastEvent;
-//                lastEvent = thisEvent;
-
-//                if (0 != delay) {
-//                    System.err.println("set delay:" + delay);
-//                    eventFrequency = 1000000000 / delay;
-//                }
 
             }
         }

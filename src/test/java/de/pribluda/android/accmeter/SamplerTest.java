@@ -30,7 +30,7 @@ public class SamplerTest {
      */
     @Test
     public void testThatWorkerIsStartedUponSinkAdding(@Mocked final Sampler.Worker worker,
-                                                      @Mocked(methods = {"addSink", "removeSink"}, inverse = true) final Sampler sampler,
+                                                      @Mocked(methods = {"addSink", "removeSink", "start", "stop"}, inverse = true) final Sampler sampler,
                                                       @Mocked final SampleSink first,
                                                       @Mocked final SampleSink second,
                                                       @Mocked final SensorManager sensorManager) {
@@ -47,9 +47,7 @@ public class SamplerTest {
         new Expectations() {
             {
                 Sampler.Worker worker = new Sampler.Worker(sensorManager, 128, SensorManager.SENSOR_DELAY_UI, 12345, sinkList);
-
                 worker.start();
-
                 worker.stop();
             }
         };
@@ -188,21 +186,22 @@ public class SamplerTest {
      * in case no sensor was found shall not register itself
      */
     @Test
-    public void testNoSensorFoundStartDoesNothing(@Mocked(methods = {"start"}, inverse = true) final Sampler sampler,
+    public void testNoSensorFoundStartDoesNothing(@Mocked(methods = {"start"}, inverse = true) final Sampler.Worker worker,
                                                   @Mocked final SensorManager sensorManager) {
 
-        Deencapsulation.setField(sampler, "sensorManager", sensorManager);
+
+        Deencapsulation.setField(worker, "sensorManager", sensorManager);
+        Deencapsulation.setField(worker, "state", Sampler.RunnerState.STOPPED);
         new Expectations() {
             {
-                invoke(sampler, "reset");
+
                 sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
                 returns(Collections.EMPTY_LIST);
             }
         };
 
-        sampler.start();
-
-        assertFalse((Boolean) Deencapsulation.getField(sampler, "active"));
+        worker.start();
+        assertEquals(Sampler.RunnerState.STOPPED,Deencapsulation.getField(worker, "state"));
     }
 
 
